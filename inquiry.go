@@ -107,7 +107,7 @@ func (u *unmarshaller) addErr(err error) {
 
 func (u *unmarshaller) getErr() error {
 	if len(u.errors) > 0 {
-		return fmt.Errorf("errors unmarshalling query string: [%s]", strings.Join(u.errors, ", "))
+		return fmt.Errorf("invalid query string format: [%s]", strings.Join(u.errors, ", "))
 	}
 
 	return nil
@@ -130,7 +130,7 @@ func (d decoder) decode(queryParams []string, value reflect.Value) error {
 		}
 		val, err := strconv.Atoi(queryParams[0])
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to map field %s", d.queryFieldName))
+			return fmt.Errorf("%s is not a valid integer", d.queryFieldName)
 		}
 		if value.OverflowInt(int64(val)) {
 			return fmt.Errorf("value of %s overflows type %s", d.queryFieldName, value.Kind().String())
@@ -145,7 +145,7 @@ func (d decoder) decode(queryParams []string, value reflect.Value) error {
 		}
 		val, err := strconv.Atoi(queryParams[0])
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to map field %s", d.queryFieldName))
+			return fmt.Errorf("%s is not a valid unsigned integer", d.queryFieldName)
 		}
 		if val < 0 {
 			return fmt.Errorf("value of %s underflows type %s", d.queryFieldName, value.Kind().String())
@@ -167,7 +167,7 @@ func (d decoder) decode(queryParams []string, value reflect.Value) error {
 		}
 		val, err := strconv.ParseFloat(queryParams[0], size)
 		if err != nil {
-			return errors.Wrap(err, fmt.Sprintf("failed to map field %s", d.queryFieldName))
+			return fmt.Errorf("%s is not a valid float", d.queryFieldName)
 		}
 		if value.OverflowFloat(float64(val)) {
 			return fmt.Errorf("value of %s overflows type %s", d.queryFieldName, value.Kind().String())

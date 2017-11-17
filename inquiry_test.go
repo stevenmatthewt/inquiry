@@ -203,3 +203,45 @@ func TestSimpleSlice(t *testing.T) {
 		t.Errorf("Field2 incorrect value: %d", out.Field2)
 	}
 }
+
+func TestInvalidInt(t *testing.T) {
+	type output struct {
+		Field1 int `query:"field1"`
+	}
+	qsMap := map[string][]string{
+		"field1": []string{
+			"23.0",
+		},
+	}
+
+	var out output
+	err := inquiry.UnmarshalMap(qsMap, &out)
+	if err == nil {
+		t.Fatal("non-nil error")
+	}
+
+	if !strings.Contains(err.Error(), "not a valid integer") {
+		t.Errorf("error in wrong format: %v", err)
+	}
+}
+
+func TestInvalidFloat(t *testing.T) {
+	type output struct {
+		Field1 float32 `query:"field1"`
+	}
+	qsMap := map[string][]string{
+		"field1": []string{
+			"23.0c",
+		},
+	}
+
+	var out output
+	err := inquiry.UnmarshalMap(qsMap, &out)
+	if err == nil {
+		t.Fatal("non-nil error")
+	}
+
+	if !strings.Contains(err.Error(), "not a valid float") {
+		t.Errorf("error in wrong format: %v", err)
+	}
+}
