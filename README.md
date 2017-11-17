@@ -8,9 +8,10 @@
 
 ```go
 type queryFormat struct {
-    AccountID int    `query:"account_id"`
-    FirstName string `query:"first_name"`
-    LastName  string `query:"last_name"`
+    AccountID      int      `query:"account_id"`
+    FirstName      string   `query:"first_name"`
+    LastName       string   `query:"last_name"`
+    FavoriteColors []string `query:"fav_colors"`
 }
 
 func ServeHTTP(w http.ResponseWriter, r *http.Request) {

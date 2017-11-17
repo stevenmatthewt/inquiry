@@ -1,7 +1,6 @@
 package inquiry
 
 import (
-	"encoding/json"
 	"fmt"
 	"reflect"
 	"strconv"
@@ -43,8 +42,13 @@ func UnmarshalMap(queryMap map[string][]string, v interface{}) (err error) {
 		if len(opts) < 1 {
 			return errors.New("Invalid struct tag format")
 		}
-		queryFieldName := opts[0]
-		opts = opts[1:]
+
+		d := decoder{
+			queryFieldName: opts[0],
+			opts:           opts[1:],
+		}
+
+		inputSlice := queryMap[d.queryFieldName]
 
 		fieldValue := s.Field(i)
 		if !fieldValue.IsValid() {
@@ -52,45 +56,19 @@ func UnmarshalMap(queryMap map[string][]string, v interface{}) (err error) {
 		}
 
 		if fieldValue.CanSet() {
-			// var queryVal interface{}
-			// switch fieldValue.Kind() {
-			// case reflect.Slice, reflect.Array:
-			// 	queryVal = queryMap[queryFieldName]
-			// default:
-			// 	if len(queryMap[queryFieldName]) <= 0 {
-			// 		cumulativeErrs = append(cumulativeErrs, errors.Wrap(err, fmt.Sprintf("must be at least on instance of %s", queryFieldName)))
-			// 	}
-			// 	if len(queryMap[queryFieldName]) > 1 {
-			// 		cumulativeErrs = append(cumulativeErrs, errors.Wrap(err, fmt.Sprintf("more than one instance of %s provider", queryFieldName)))
-			// 		continue
-			// 	}
-			// 	queryVal = queryMap[queryFieldName][0]
-			// }
-			// err = storeValue(queryVal, fieldValue.Addr().Interface())
-			// if err != nil {
-			// 	cumulativeErrs = append(cumulativeErrs, errors.Wrap(err, fmt.Sprintf("failed to unmarshal field %s", queryFieldName)))
-			// }
-
-			d := decoder{
-				queryFieldName: queryFieldName,
-				queryParams:    queryMap[queryFieldName],
-			}
-
 			switch fieldValue.Kind() {
 			// This case statemtent could be made a part of decode()
 			// but that would enable this to supprt nested arrays.
 			// I'm not certain that's something that I want to
 			// support at this time.
 			case reflect.Slice, reflect.Array:
-				inputSlice := queryMap[queryFieldName]
 				outputSlice := reflect.MakeSlice(fieldValue.Type(), 0, len(inputSlice))
 				for i := 0; i < len(inputSlice); i++ {
 					tempValue := reflect.New(fieldValue.Type().Elem())
 					data := inputSlice[i]
 					err = decoder{
 						queryFieldName: d.queryFieldName,
-						queryParams:    []string{data},
-					}.decode(tempValue.Elem())
+					}.decode([]string{data}, tempValue.Elem())
 					if err != nil {
 						cumulativeErrs = append(cumulativeErrs, err)
 						continue
@@ -99,7 +77,7 @@ func UnmarshalMap(queryMap map[string][]string, v interface{}) (err error) {
 				}
 				fieldValue.Set(outputSlice)
 			default:
-				err = d.decode(fieldValue)
+				err = d.decode(inputSlice, fieldValue)
 				if err != nil {
 					cumulativeErrs = append(cumulativeErrs, err)
 				}
@@ -115,20 +93,20 @@ func UnmarshalMap(queryMap map[string][]string, v interface{}) (err error) {
 }
 
 type decoder struct {
-	queryParams    []string
+	opts           []string
 	queryFieldName string
 }
 
-func (d decoder) decode(value reflect.Value) error {
+func (d decoder) decode(queryParams []string, value reflect.Value) error {
 	switch value.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-		if len(d.queryParams) > 1 {
+		if len(queryParams) > 1 {
 			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
 		}
-		if len(d.queryParams) < 1 {
+		if len(queryParams) < 1 {
 			return fmt.Errorf("must be at least one instance of %s", d.queryFieldName)
 		}
-		val, err := strconv.Atoi(d.queryParams[0])
+		val, err := strconv.Atoi(queryParams[0])
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to map field %s", d.queryFieldName))
 		}
@@ -137,13 +115,13 @@ func (d decoder) decode(value reflect.Value) error {
 		}
 		value.SetInt(int64(val))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-		if len(d.queryParams) > 1 {
+		if len(queryParams) > 1 {
 			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
 		}
-		if len(d.queryParams) < 1 {
+		if len(queryParams) < 1 {
 			return fmt.Errorf("must be at least on instance of %s", d.queryFieldName)
 		}
-		val, err := strconv.Atoi(d.queryParams[0])
+		val, err := strconv.Atoi(queryParams[0])
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to map field %s", d.queryFieldName))
 		}
@@ -155,17 +133,17 @@ func (d decoder) decode(value reflect.Value) error {
 		}
 		value.SetUint(uint64(val))
 	case reflect.Float32, reflect.Float64:
-		if len(d.queryParams) > 1 {
+		if len(queryParams) > 1 {
 			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
 		}
-		if len(d.queryParams) < 1 {
+		if len(queryParams) < 1 {
 			return fmt.Errorf("must be at least on instance of %s", d.queryFieldName)
 		}
 		size := 32
 		if value.Kind() == reflect.Float64 {
 			size = 64
 		}
-		val, err := strconv.ParseFloat(d.queryParams[0], size)
+		val, err := strconv.ParseFloat(queryParams[0], size)
 		if err != nil {
 			return errors.Wrap(err, fmt.Sprintf("failed to map field %s", d.queryFieldName))
 		}
@@ -174,35 +152,16 @@ func (d decoder) decode(value reflect.Value) error {
 		}
 		value.SetFloat(float64(val))
 	case reflect.String:
-		if len(d.queryParams) > 1 {
+		if len(queryParams) > 1 {
 			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
 		}
-		if len(d.queryParams) < 1 {
+		if len(queryParams) < 1 {
 			return fmt.Errorf("must be at least on instance of %s", d.queryFieldName)
 		}
-		value.SetString(d.queryParams[0])
+		value.SetString(queryParams[0])
 	default:
 		return fmt.Errorf("%s is not a supported type", value.Kind().String())
 	}
 
 	return nil
-}
-
-func storeValue(data interface{}, variable interface{}) error {
-	var inputStruct struct {
-		Temp interface{}
-	}
-	var outputStruct struct {
-		Temp interface{}
-	}
-	outputStruct.Temp = variable
-
-	inputStruct.Temp = data
-	bytes, err := json.Marshal(inputStruct)
-	if err != nil {
-		return err
-	}
-	err = json.Unmarshal(bytes, &outputStruct)
-	fmt.Printf("just stored: %x\n", variable)
-	return err
 }
