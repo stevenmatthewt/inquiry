@@ -14,16 +14,29 @@ const tagName = "query"
 func UnmarshalMap(queryMap map[string][]string, v interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			// var ok bool
-			// err, ok = r.(error)
-			// if !ok {
-			panic(r)
-			// }
+			var ok bool
+			err, ok = r.(error)
+			if !ok {
+				err = fmt.Errorf("unexpected panic when unmarshalling query params: %+v", r)
+			}
 		}
 	}()
-	var cumulativeErrs []error
-	// TypeOf returns the reflection Type that represents the dynamic type of variable.
-	// If variable is a nil interface value, TypeOf returns nil.
+
+	u := unmarshaller{
+		queryMap: queryMap,
+	}
+	return u.unmarshal(v)
+
+}
+
+// unmashaller is used internally to help share information
+// during the unmarshalling process
+type unmarshaller struct {
+	errors   []string
+	queryMap map[string][]string
+}
+
+func (u *unmarshaller) unmarshal(v interface{}) error {
 	s := reflect.ValueOf(v).Elem()
 	t := s.Type()
 	if s.Kind() != reflect.Struct {
@@ -48,7 +61,7 @@ func UnmarshalMap(queryMap map[string][]string, v interface{}) (err error) {
 			opts:           opts[1:],
 		}
 
-		inputSlice := queryMap[d.queryFieldName]
+		inputSlice := u.queryMap[d.queryFieldName]
 
 		fieldValue := s.Field(i)
 		if !fieldValue.IsValid() {
@@ -66,32 +79,41 @@ func UnmarshalMap(queryMap map[string][]string, v interface{}) (err error) {
 				for i := 0; i < len(inputSlice); i++ {
 					tempValue := reflect.New(fieldValue.Type().Elem())
 					data := inputSlice[i]
-					err = decoder{
+					err := decoder{
 						queryFieldName: d.queryFieldName,
 					}.decode([]string{data}, tempValue.Elem())
 					if err != nil {
-						cumulativeErrs = append(cumulativeErrs, err)
+						u.addErr(err)
 						continue
 					}
 					outputSlice = reflect.Append(outputSlice, tempValue.Elem())
 				}
 				fieldValue.Set(outputSlice)
 			default:
-				err = d.decode(inputSlice, fieldValue)
+				err := d.decode(inputSlice, fieldValue)
 				if err != nil {
-					cumulativeErrs = append(cumulativeErrs, err)
+					u.addErr(err)
 				}
 			}
 		}
 	}
 
-	if len(cumulativeErrs) > 0 {
-		return fmt.Errorf("%+v", cumulativeErrs)
+	return u.getErr()
+}
+
+func (u *unmarshaller) addErr(err error) {
+	u.errors = append(u.errors, err.Error())
+}
+
+func (u *unmarshaller) getErr() error {
+	if len(u.errors) > 0 {
+		return fmt.Errorf("errors unmarshalling query string: [%s]", strings.Join(u.errors, ", "))
 	}
 
 	return nil
 }
 
+// decoder is responsible for decoding a **single** field
 type decoder struct {
 	opts           []string
 	queryFieldName string
