@@ -111,7 +111,7 @@ func TestOverflow(t *testing.T) {
 	fmt.Printf("correct address %p\n", &out.Field1)
 	err := inquiry.UnmarshalMap(qsMap, &out)
 	if err == nil {
-		t.Error("non-nil error returned")
+		t.Fatal("non-nil error returned")
 	}
 
 	if !strings.Contains(err.Error(), "overflow") {
@@ -133,7 +133,7 @@ func TestUnderflow(t *testing.T) {
 	fmt.Printf("correct address %p\n", &out.Field1)
 	err := inquiry.UnmarshalMap(qsMap, &out)
 	if err == nil {
-		t.Error("non-nil error returned")
+		t.Fatal("non-nil error returned")
 	}
 
 	if !strings.Contains(err.Error(), "underflow") {

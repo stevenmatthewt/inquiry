@@ -31,10 +31,6 @@ func UnmarshalMap(queryMap map[string][]string, v interface{}) (err error) {
 		return fmt.Errorf("output type must be of type struct; %s was given", s.Kind().String())
 	}
 
-	// Get the type and kind of our user variable
-	fmt.Println("Type:", t.Name())
-	fmt.Println("Kind:", t.Kind())
-
 	// Iterate over all available fields and read the tag value
 	for i := 0; i < t.NumField(); i++ {
 		field := t.Field(i)
@@ -75,88 +71,118 @@ func UnmarshalMap(queryMap map[string][]string, v interface{}) (err error) {
 			// 	cumulativeErrs = append(cumulativeErrs, errors.Wrap(err, fmt.Sprintf("failed to unmarshal field %s", queryFieldName)))
 			// }
 
+			d := decoder{
+				queryFieldName: queryFieldName,
+				queryParams:    queryMap[queryFieldName],
+			}
+
 			switch fieldValue.Kind() {
-			case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
-				if len(queryMap[queryFieldName]) > 1 {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("more than one instance of %s provider", queryFieldName))
-					continue
+			// This case statemtent could be made a part of decode()
+			// but that would enable this to supprt nested arrays.
+			// I'm not certain that's something that I want to
+			// support at this time.
+			case reflect.Slice, reflect.Array:
+				inputSlice := queryMap[queryFieldName]
+				outputSlice := reflect.MakeSlice(fieldValue.Type(), 0, len(inputSlice))
+				for i := 0; i < len(inputSlice); i++ {
+					tempValue := reflect.New(fieldValue.Type().Elem())
+					data := inputSlice[i]
+					err = decoder{
+						queryFieldName: d.queryFieldName,
+						queryParams:    []string{data},
+					}.decode(tempValue.Elem())
+					if err != nil {
+						cumulativeErrs = append(cumulativeErrs, err)
+						continue
+					}
+					outputSlice = reflect.Append(outputSlice, tempValue.Elem())
 				}
-				if len(queryMap[queryFieldName]) < 1 {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("must be at least on instance of %s", queryFieldName))
-					continue
-				}
-				val, err := strconv.Atoi(queryMap[queryFieldName][0])
+				fieldValue.Set(outputSlice)
+			default:
+				err = d.decode(fieldValue)
 				if err != nil {
-					cumulativeErrs = append(cumulativeErrs, errors.Wrap(err, fmt.Sprintf("failed to map field %s", queryFieldName)))
-					continue
+					cumulativeErrs = append(cumulativeErrs, err)
 				}
-				if fieldValue.OverflowInt(int64(val)) {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("value of %s overflows type %s", queryFieldName, fieldValue.Kind().String()))
-				}
-				fieldValue.SetInt(int64(val))
-			case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
-				if len(queryMap[queryFieldName]) > 1 {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("more than one instance of %s provider", queryFieldName))
-					continue
-				}
-				if len(queryMap[queryFieldName]) < 1 {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("must be at least on instance of %s", queryFieldName))
-					continue
-				}
-				val, err := strconv.Atoi(queryMap[queryFieldName][0])
-				if err != nil {
-					cumulativeErrs = append(cumulativeErrs, errors.Wrap(err, fmt.Sprintf("failed to map field %s", queryFieldName)))
-					continue
-				}
-				if val < 0 {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("value of %s underflows type %s", queryFieldName, fieldValue.Kind().String()))
-				}
-				if fieldValue.OverflowUint(uint64(val)) {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("value of %s overflows type %s", queryFieldName, fieldValue.Kind().String()))
-				}
-				fieldValue.SetUint(uint64(val))
-			case reflect.Float32, reflect.Float64:
-				if len(queryMap[queryFieldName]) > 1 {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("more than one instance of %s provider", queryFieldName))
-					continue
-				}
-				if len(queryMap[queryFieldName]) < 1 {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("must be at least on instance of %s", queryFieldName))
-					continue
-				}
-				size := 32
-				if fieldValue.Kind() == reflect.Float64 {
-					size = 64
-				}
-				val, err := strconv.ParseFloat(queryMap[queryFieldName][0], size)
-				if err != nil {
-					cumulativeErrs = append(cumulativeErrs, errors.Wrap(err, fmt.Sprintf("failed to map field %s", queryFieldName)))
-					continue
-				}
-				if fieldValue.OverflowFloat(float64(val)) {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("value of %s overflows type %s", queryFieldName, fieldValue.Kind().String()))
-				}
-				fieldValue.SetFloat(float64(val))
-			case reflect.String:
-				if len(queryMap[queryFieldName]) > 1 {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("more than one instance of %s provider", queryFieldName))
-					continue
-				}
-				if len(queryMap[queryFieldName]) < 1 {
-					cumulativeErrs = append(cumulativeErrs, fmt.Errorf("must be at least on instance of %s", queryFieldName))
-					continue
-				}
-				fieldValue.SetString(queryMap[queryFieldName][0])
-			case reflect.Slice:
-				fallthrough
-			case reflect.Array:
-				fmt.Println("WE GOT A BIG ONE!")
 			}
 		}
 	}
 
 	if len(cumulativeErrs) > 0 {
 		return fmt.Errorf("%+v", cumulativeErrs)
+	}
+
+	return nil
+}
+
+type decoder struct {
+	queryParams    []string
+	queryFieldName string
+}
+
+func (d decoder) decode(value reflect.Value) error {
+	switch value.Kind() {
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		if len(d.queryParams) > 1 {
+			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
+		}
+		if len(d.queryParams) < 1 {
+			return fmt.Errorf("must be at least one instance of %s", d.queryFieldName)
+		}
+		val, err := strconv.Atoi(d.queryParams[0])
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to map field %s", d.queryFieldName))
+		}
+		if value.OverflowInt(int64(val)) {
+			return fmt.Errorf("value of %s overflows type %s", d.queryFieldName, value.Kind().String())
+		}
+		value.SetInt(int64(val))
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		if len(d.queryParams) > 1 {
+			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
+		}
+		if len(d.queryParams) < 1 {
+			return fmt.Errorf("must be at least on instance of %s", d.queryFieldName)
+		}
+		val, err := strconv.Atoi(d.queryParams[0])
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to map field %s", d.queryFieldName))
+		}
+		if val < 0 {
+			return fmt.Errorf("value of %s underflows type %s", d.queryFieldName, value.Kind().String())
+		}
+		if value.OverflowUint(uint64(val)) {
+			return fmt.Errorf("value of %s overflows type %s", d.queryFieldName, value.Kind().String())
+		}
+		value.SetUint(uint64(val))
+	case reflect.Float32, reflect.Float64:
+		if len(d.queryParams) > 1 {
+			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
+		}
+		if len(d.queryParams) < 1 {
+			return fmt.Errorf("must be at least on instance of %s", d.queryFieldName)
+		}
+		size := 32
+		if value.Kind() == reflect.Float64 {
+			size = 64
+		}
+		val, err := strconv.ParseFloat(d.queryParams[0], size)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to map field %s", d.queryFieldName))
+		}
+		if value.OverflowFloat(float64(val)) {
+			return fmt.Errorf("value of %s overflows type %s", d.queryFieldName, value.Kind().String())
+		}
+		value.SetFloat(float64(val))
+	case reflect.String:
+		if len(d.queryParams) > 1 {
+			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
+		}
+		if len(d.queryParams) < 1 {
+			return fmt.Errorf("must be at least on instance of %s", d.queryFieldName)
+		}
+		value.SetString(d.queryParams[0])
+	default:
+		return fmt.Errorf("%s is not a supported type", value.Kind().String())
 	}
 
 	return nil
