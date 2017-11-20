@@ -125,7 +125,8 @@ func (d decoder) decode(queryParams []string, value reflect.Value) error {
 			return fmt.Errorf("more than one instance of parameter '%s'", d.queryFieldName)
 		}
 		if len(queryParams) < 1 {
-			return fmt.Errorf("must be at least one instance of '%s'", d.queryFieldName)
+			// The parameter wasn't provided, just default to the Zero value
+			return nil
 		}
 		val, err := strconv.Atoi(queryParams[0])
 		if err != nil {
@@ -140,7 +141,8 @@ func (d decoder) decode(queryParams []string, value reflect.Value) error {
 			return fmt.Errorf("more than one instance of parameter '%s'", d.queryFieldName)
 		}
 		if len(queryParams) < 1 {
-			return fmt.Errorf("must be at least one instance of '%s'", d.queryFieldName)
+			// The parameter wasn't provided, just default to the Zero value
+			return nil
 		}
 		val, err := strconv.Atoi(queryParams[0])
 		if err != nil {
@@ -158,7 +160,8 @@ func (d decoder) decode(queryParams []string, value reflect.Value) error {
 			return fmt.Errorf("more than one instance of parameter '%s'", d.queryFieldName)
 		}
 		if len(queryParams) < 1 {
-			return fmt.Errorf("must be at least one instance of '%s'", d.queryFieldName)
+			// The parameter wasn't provided, just default to the Zero value
+			return nil
 		}
 		size := 32
 		if value.Kind() == reflect.Float64 {
@@ -177,7 +180,8 @@ func (d decoder) decode(queryParams []string, value reflect.Value) error {
 			return fmt.Errorf("more than one instance of parameter '%s'", d.queryFieldName)
 		}
 		if len(queryParams) < 1 {
-			return fmt.Errorf("must be at least one instance of '%s'", d.queryFieldName)
+			// The parameter wasn't provided, just default to the Zero value
+			return nil
 		}
 		value.SetString(queryParams[0])
 	default:
