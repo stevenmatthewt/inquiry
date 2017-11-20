@@ -50,7 +50,6 @@ func (u *unmarshaller) unmarshal(v interface{}) error {
 		// Get the field tag value
 		tag := field.Tag.Get(tagName)
 
-		fmt.Printf("%d. %v (%v), tag: '%v'\n", i+1, field.Name, field.Type.Name(), tag)
 		opts := strings.Split(tag, ",")
 		if len(opts) < 1 {
 			return errors.New("Invalid struct tag format")
@@ -107,7 +106,7 @@ func (u *unmarshaller) addErr(err error) {
 
 func (u *unmarshaller) getErr() error {
 	if len(u.errors) > 0 {
-		return fmt.Errorf("invalid query string format: [%s]", strings.Join(u.errors, ", "))
+		return fmt.Errorf("errors: [%s]", strings.Join(u.errors, ", "))
 	}
 
 	return nil
@@ -123,43 +122,43 @@ func (d decoder) decode(queryParams []string, value reflect.Value) error {
 	switch value.Kind() {
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		if len(queryParams) > 1 {
-			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
+			return fmt.Errorf("more than one instance of parameter '%s'", d.queryFieldName)
 		}
 		if len(queryParams) < 1 {
-			return fmt.Errorf("must be at least one instance of %s", d.queryFieldName)
+			return fmt.Errorf("must be at least one instance of '%s'", d.queryFieldName)
 		}
 		val, err := strconv.Atoi(queryParams[0])
 		if err != nil {
 			return fmt.Errorf("%s is not a valid integer", d.queryFieldName)
 		}
 		if value.OverflowInt(int64(val)) {
-			return fmt.Errorf("value of %s overflows type %s", d.queryFieldName, value.Kind().String())
+			return fmt.Errorf("value of '%s' overflows type %s", d.queryFieldName, value.Kind().String())
 		}
 		value.SetInt(int64(val))
 	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
 		if len(queryParams) > 1 {
-			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
+			return fmt.Errorf("more than one instance of parameter '%s'", d.queryFieldName)
 		}
 		if len(queryParams) < 1 {
-			return fmt.Errorf("must be at least on instance of %s", d.queryFieldName)
+			return fmt.Errorf("must be at least one instance of '%s'", d.queryFieldName)
 		}
 		val, err := strconv.Atoi(queryParams[0])
 		if err != nil {
-			return fmt.Errorf("%s is not a valid unsigned integer", d.queryFieldName)
+			return fmt.Errorf("'%s' is not a valid unsigned integer", d.queryFieldName)
 		}
 		if val < 0 {
-			return fmt.Errorf("value of %s underflows type %s", d.queryFieldName, value.Kind().String())
+			return fmt.Errorf("value of '%s' underflows type %s", d.queryFieldName, value.Kind().String())
 		}
 		if value.OverflowUint(uint64(val)) {
-			return fmt.Errorf("value of %s overflows type %s", d.queryFieldName, value.Kind().String())
+			return fmt.Errorf("value of '%s' overflows type %s", d.queryFieldName, value.Kind().String())
 		}
 		value.SetUint(uint64(val))
 	case reflect.Float32, reflect.Float64:
 		if len(queryParams) > 1 {
-			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
+			return fmt.Errorf("more than one instance of parameter '%s'", d.queryFieldName)
 		}
 		if len(queryParams) < 1 {
-			return fmt.Errorf("must be at least on instance of %s", d.queryFieldName)
+			return fmt.Errorf("must be at least one instance of '%s'", d.queryFieldName)
 		}
 		size := 32
 		if value.Kind() == reflect.Float64 {
@@ -167,18 +166,18 @@ func (d decoder) decode(queryParams []string, value reflect.Value) error {
 		}
 		val, err := strconv.ParseFloat(queryParams[0], size)
 		if err != nil {
-			return fmt.Errorf("%s is not a valid float", d.queryFieldName)
+			return fmt.Errorf("'%s' is not a valid float", d.queryFieldName)
 		}
 		if value.OverflowFloat(float64(val)) {
-			return fmt.Errorf("value of %s overflows type %s", d.queryFieldName, value.Kind().String())
+			return fmt.Errorf("value of '%s' overflows type %s", d.queryFieldName, value.Kind().String())
 		}
 		value.SetFloat(float64(val))
 	case reflect.String:
 		if len(queryParams) > 1 {
-			return fmt.Errorf("more than one instance of %s provider", d.queryFieldName)
+			return fmt.Errorf("more than one instance of parameter '%s'", d.queryFieldName)
 		}
 		if len(queryParams) < 1 {
-			return fmt.Errorf("must be at least on instance of %s", d.queryFieldName)
+			return fmt.Errorf("must be at least one instance of '%s'", d.queryFieldName)
 		}
 		value.SetString(queryParams[0])
 	default:
