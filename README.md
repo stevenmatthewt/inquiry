@@ -1,6 +1,6 @@
 # inquiry
 
-`inquiry` is a simple package desiged to facilitate with handling Query String parameters in Golang HTTP Servers. It allows Query String parameters to be automtically Unmarshalled into a struct, thus promoting type safety throughout the rest of your code.
+`inquiry` is a simple package desiged to facilitate with handling Query String parameters in Golang HTTP Servers. It allows Query String parameters to be automatically Unmarshalled into a struct, thus promoting type safety throughout the rest of your code.
 
 ## How to use
 
