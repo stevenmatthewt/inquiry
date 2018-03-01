@@ -11,6 +11,8 @@ import (
 
 const tagName = "query"
 
+// UnmarshalMap takes a map[string][]string (the type that Go uses to represent 
+// query string parameters) and Unmarshals it into the struct provided.
 func UnmarshalMap(queryMap map[string][]string, v interface{}) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
